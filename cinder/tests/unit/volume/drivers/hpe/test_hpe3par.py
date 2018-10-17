@@ -241,6 +241,14 @@ class HPE3PARBaseDriver(object):
                           'volume_type': None,
                           'volume_type_id': VOLUME_TYPE_ID_FLASH_CACHE}
 
+    volume_hos = {'name': VOLUME_NAME,
+                  'id': VOLUME_ID,
+                  'display_name': 'Foo Volume',
+                  'size': 2,
+                  'host': FAKE_CINDER_HOST,
+                  'volume_type': None,
+                  'volume_type_id': 'hos'}
+
     snapshot = {'name': SNAPSHOT_NAME,
                 'id': SNAPSHOT_ID,
                 'user_id': USER_ID,
@@ -317,6 +325,13 @@ class HPE3PARBaseDriver(object):
                                                'hpe3par:flash_cache': 'true'},
                                'deleted_at': None,
                                'id': VOLUME_TYPE_ID_FLASH_CACHE}
+
+    volume_type_hos = {'name': 'hos',
+                       'deleted': False,
+                       'updated_at': None,
+                       'extra_specs': {'convert_to_base': False},
+                       'deleted_at': None,
+                       'id': 'hos'}
 
     flash_cache_3par_keys = {'flash_cache': 'true'}
 
@@ -3386,6 +3401,224 @@ class HPE3PARBaseDriver(object):
             self.assertRaises(exception.InvalidInput,
                               self.driver.create_volume_from_snapshot,
                               volume, self.snapshot)
+
+    @mock.patch.object(volume_types, 'get_volume_type')
+    def test_create_volume_from_snapshot_hos5(self, _mock_volume_types):
+        # setup_mock_client drive with default configuration
+        # and return the mock HTTP 3PAR client
+        mock_client = self.setup_driver()
+        _mock_volume_types.return_value = {
+            'name': 'hos',
+            'extra_specs': {
+                'convert_to_base': False,
+                'volume_type': self.volume_type_hos}}
+        with mock.patch.object(hpecommon.HPE3PARCommon,
+                               '_create_client') as mock_create_client:
+            mock_create_client.return_value = mock_client
+            common = self.driver._login()
+            volume = self.volume_hos.copy()
+            model_update = self.driver.create_volume_from_snapshot(
+                volume,
+                self.snapshot)
+            self.assertEqual(model_update, {})
+
+            comment = Comment({
+                "snapshot_id": "2f823bdc-e36e-4dc8-bd15-de1c7a28ff31",
+                "display_name": "Foo Volume",
+                "volume_id": "d03338a9-9115-48a3-8dfc-35cdfcdc15a7",
+            })
+
+            expected = [
+                mock.call.createSnapshot(
+                    self.VOLUME_3PAR_NAME,
+                    'oss-L4I73ONuTci9Fd4ceij-MQ',
+                    {
+                        'comment': comment,
+                        'readOnly': False})]
+
+            mock_client.assert_has_calls(
+                self.standard_login +
+                expected +
+                self.standard_logout)
+
+            volume = self.volume_hos.copy()
+            volume['size'] = 1
+            self.assertRaises(exception.InvalidInput,
+                              self.driver.create_volume_from_snapshot,
+                              volume, self.snapshot)
+
+    @mock.patch.object(volume_types, 'get_volume_type')
+    def test_create_volume_from_snapshot_hos8(self, _mock_volume_types):
+        # setup_mock_client drive with default configuration
+        # and return the mock HTTP 3PAR client
+        conf = {
+            'getTask.return_value': {
+                'status': 1},
+            'copyVolume.return_value': {'taskid': 1},
+            'getVolume.return_value': {}
+        }
+        mock_client = self.setup_driver(mock_conf=conf)
+        _mock_volume_types.return_value = {
+            'name': 'hos',
+            'extra_specs': {
+                'convert_to_base': True,
+                'volume_type': self.volume_type_hos}}
+        with mock.patch.object(hpecommon.HPE3PARCommon,
+                               '_create_client') as mock_create_client:
+            mock_create_client.return_value = mock_client
+            common = self.driver._login()
+            volume = self.volume_hos.copy()
+            model_update = self.driver.create_volume_from_snapshot(
+                volume,
+                self.snapshot)
+            self.assertIsNone(model_update)
+
+            comment = Comment({
+                "snapshot_id": "2f823bdc-e36e-4dc8-bd15-de1c7a28ff31",
+                "display_name": "Foo Volume",
+                "volume_id": "d03338a9-9115-48a3-8dfc-35cdfcdc15a7",
+            })
+            volume_name_3par = common._encode_name(volume['id'])
+            osv_matcher = 'osv-' + volume_name_3par
+            omv_matcher = 'omv-' + volume_name_3par
+
+            expected = [
+                mock.call.createSnapshot(
+                    self.VOLUME_3PAR_NAME,
+                    'oss-L4I73ONuTci9Fd4ceij-MQ',
+                    {
+                        'comment': comment,
+                        'readOnly': False}),
+                mock.call.copyVolume(
+                    osv_matcher, omv_matcher, HPE3PAR_CPG, mock.ANY),
+                mock.call.getTask(mock.ANY),
+                mock.call.getVolume(osv_matcher),
+                mock.call.deleteVolume(osv_matcher),
+                mock.call.modifyVolume(omv_matcher, {'newName': osv_matcher})]
+
+            mock_client.assert_has_calls(
+                self.standard_login +
+                expected +
+                self.standard_logout)
+
+            volume = self.volume_hos.copy()
+            volume['size'] = 1
+            self.assertRaises(exception.InvalidInput,
+                              self.driver.create_volume_from_snapshot,
+                              volume, self.snapshot)
+
+
+    @mock.patch.object(volume_types, 'get_volume_type')
+    def test_create_volume_from_snapshot_hos5_and_extend(self, _mock_volume_types):
+        # setup_mock_client drive with default configuration
+        # and return the mock HTTP 3PAR client
+        conf = {
+            'getTask.return_value': {
+                'status': 1},
+            'copyVolume.return_value': {'taskid': 1},
+            'getVolume.return_value': {}
+        }
+        mock_client = self.setup_driver(mock_conf=conf)
+        _mock_volume_types.return_value = {
+            'name': 'hos',
+            'extra_specs': {
+                'convert_to_base': False,
+                'volume_type': self.volume_type_hos}}
+        with mock.patch.object(hpecommon.HPE3PARCommon,
+                               '_create_client') as mock_create_client:
+            mock_create_client.return_value = mock_client
+            common = self.driver._login()
+            volume = self.volume_hos.copy()
+            volume['size'] = self.volume['size'] + 10
+            model_update = self.driver.create_volume_from_snapshot(
+                volume,
+                self.snapshot)
+            self.assertIsNone(model_update)
+
+            comment = Comment({
+                "snapshot_id": "2f823bdc-e36e-4dc8-bd15-de1c7a28ff31",
+                "display_name": "Foo Volume",
+                "volume_id": "d03338a9-9115-48a3-8dfc-35cdfcdc15a7",
+            })
+            volume_name_3par = common._encode_name(volume['id'])
+            osv_matcher = 'osv-' + volume_name_3par
+            omv_matcher = 'omv-' + volume_name_3par
+
+            expected = [
+                mock.call.createSnapshot(
+                    self.VOLUME_3PAR_NAME,
+                    'oss-L4I73ONuTci9Fd4ceij-MQ',
+                    {
+                        'comment': comment,
+                        'readOnly': False}),
+                mock.call.copyVolume(
+                    osv_matcher, omv_matcher, HPE3PAR_CPG, mock.ANY),
+                mock.call.getTask(mock.ANY),
+                mock.call.getVolume(osv_matcher),
+                mock.call.deleteVolume(osv_matcher),
+                mock.call.modifyVolume(omv_matcher, {'newName': osv_matcher}),
+                mock.call.growVolume(osv_matcher, 10 * 1024)]
+
+            mock_client.assert_has_calls(
+                self.standard_login +
+                expected +
+                self.standard_logout)
+
+    @mock.patch.object(volume_types, 'get_volume_type')
+    def test_create_volume_from_snapshot_hos8_and_extend(self, _mock_volume_types):
+        # setup_mock_client drive with default configuration
+        # and return the mock HTTP 3PAR client
+        conf = {
+            'getTask.return_value': {
+                'status': 1},
+            'copyVolume.return_value': {'taskid': 1},
+            'getVolume.return_value': {}
+        }
+        mock_client = self.setup_driver(mock_conf=conf)
+        _mock_volume_types.return_value = {
+            'name': 'hos',
+            'extra_specs': {
+                'convert_to_base': True,
+                'volume_type': self.volume_type_hos}}
+        with mock.patch.object(hpecommon.HPE3PARCommon,
+                               '_create_client') as mock_create_client:
+            mock_create_client.return_value = mock_client
+            common = self.driver._login()
+            volume = self.volume_hos.copy()
+            volume['size'] = self.volume['size'] + 10
+            model_update = self.driver.create_volume_from_snapshot(
+                volume,
+                self.snapshot)
+            self.assertIsNone(model_update)
+
+            comment = Comment({
+                "snapshot_id": "2f823bdc-e36e-4dc8-bd15-de1c7a28ff31",
+                "display_name": "Foo Volume",
+                "volume_id": "d03338a9-9115-48a3-8dfc-35cdfcdc15a7",
+            })
+            volume_name_3par = common._encode_name(volume['id'])
+            osv_matcher = 'osv-' + volume_name_3par
+            omv_matcher = 'omv-' + volume_name_3par
+
+            expected = [
+                mock.call.createSnapshot(
+                    self.VOLUME_3PAR_NAME,
+                    'oss-L4I73ONuTci9Fd4ceij-MQ',
+                    {
+                        'comment': comment,
+                        'readOnly': False}),
+                mock.call.copyVolume(
+                    osv_matcher, omv_matcher, HPE3PAR_CPG, mock.ANY),
+                mock.call.getTask(mock.ANY),
+                mock.call.getVolume(osv_matcher),
+                mock.call.deleteVolume(osv_matcher),
+                mock.call.modifyVolume(omv_matcher, {'newName': osv_matcher}),
+                mock.call.growVolume(osv_matcher, 10 * 1024)]
+
+            mock_client.assert_has_calls(
+                self.standard_login +
+                expected +
+                self.standard_logout)
 
     def test_terminate_connection(self):
         # setup_mock_client drive with default configuration
