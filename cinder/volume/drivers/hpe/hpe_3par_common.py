@@ -1898,7 +1898,7 @@ class HPE3PARCommon(object):
             snap_cpg = cpg
 
         # by default, follow HOS8 behaviour i.e convert_to_base is True
-        convert_to_base = self._get_key_value(hpe3par_keys, 'convert_to_base', True)
+        convert_to_base = self._get_key_value(hpe3par_keys, 'convert_to_base', 'True')
 
         # if provisioning is not set use thin
         default_prov = self.valid_prov_values[0]
@@ -2419,17 +2419,14 @@ class HPE3PARCommon(object):
 
             self.client.createSnapshot(volume_name, snap_name, optional)
 
-            convert_to_base = self._get_key_value(hpe3par_keys, 'convert_to_base', True)
-            convert_to_base_str = str(convert_to_base)
-            LOG.debug("convert_to_base_str: " + convert_to_base_str)
-            if convert_to_base_str.lower() == 'true':
-                LOG.debug("default HOS8 behaviour")
+            convert_to_base = self._get_key_value(hpe3par_keys, 'convert_to_base', 'True')
+            LOG.debug("convert_to_base: " + convert_to_base)
+            if convert_to_base.lower() == 'true':
                 # Convert snapshot volume to base volume type
                 LOG.debug('Converting to base volume type: %s.',
                           volume['id'])
                 model_update = self._convert_to_base_volume(volume)
             else:
-                LOG.debug("HOS5 behaviour")
                 LOG.debug("volume is created as child of snapshot")
 
             # Grow the snapshot if needed
@@ -2437,7 +2434,7 @@ class HPE3PARCommon(object):
             if growth_size > 0:
                 try:
                     LOG.debug("Size of volume is greater than snapshot")
-                    if convert_to_base_str.lower() == 'false':
+                    if convert_to_base.lower() == 'false':
                         # Convert snapshot volume to base volume type
                         LOG.debug('Converting to base volume type: %s.',
                                   volume['id'])

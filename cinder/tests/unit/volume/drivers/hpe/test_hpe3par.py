@@ -329,7 +329,7 @@ class HPE3PARBaseDriver(object):
     volume_type_hos = {'name': 'hos',
                        'deleted': False,
                        'updated_at': None,
-                       'extra_specs': {'convert_to_base': False},
+                       'extra_specs': {'convert_to_base': 'False'},
                        'deleted_at': None,
                        'id': 'hos'}
 
@@ -3410,7 +3410,7 @@ class HPE3PARBaseDriver(object):
         _mock_volume_types.return_value = {
             'name': 'hos',
             'extra_specs': {
-                'convert_to_base': False,
+                'convert_to_base': 'False',
                 'volume_type': self.volume_type_hos}}
         with mock.patch.object(hpecommon.HPE3PARCommon,
                                '_create_client') as mock_create_client:
@@ -3461,7 +3461,7 @@ class HPE3PARBaseDriver(object):
         _mock_volume_types.return_value = {
             'name': 'hos',
             'extra_specs': {
-                'convert_to_base': True,
+                'convert_to_base': 'True',
                 'volume_type': self.volume_type_hos}}
         with mock.patch.object(hpecommon.HPE3PARCommon,
                                '_create_client') as mock_create_client:
@@ -3522,7 +3522,7 @@ class HPE3PARBaseDriver(object):
         _mock_volume_types.return_value = {
             'name': 'hos',
             'extra_specs': {
-                'convert_to_base': False,
+                'convert_to_base': 'False',
                 'volume_type': self.volume_type_hos}}
         with mock.patch.object(hpecommon.HPE3PARCommon,
                                '_create_client') as mock_create_client:
@@ -3578,7 +3578,7 @@ class HPE3PARBaseDriver(object):
         _mock_volume_types.return_value = {
             'name': 'hos',
             'extra_specs': {
-                'convert_to_base': True,
+                'convert_to_base': 'True',
                 'volume_type': self.volume_type_hos}}
         with mock.patch.object(hpecommon.HPE3PARCommon,
                                '_create_client') as mock_create_client:
