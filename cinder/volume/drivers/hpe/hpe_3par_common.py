@@ -324,7 +324,8 @@ class HPE3PARCommon(object):
                     'priority']
     qos_priority_level = {'low': 1, 'normal': 2, 'high': 3}
     hpe3par_valid_keys = ['cpg', 'snap_cpg', 'provisioning', 'persona', 'vvs',
-                          'flash_cache', 'compression']
+                          'flash_cache', 'compression',
+                          'convert_to_base']
 
     def __init__(self, config, active_backend_id=None):
         self.config = config
@@ -1896,6 +1897,9 @@ class HPE3PARCommon(object):
         if not snap_cpg:
             snap_cpg = cpg
 
+        # by default, follow HOS8 behaviour i.e convert_to_base is True
+        convert_to_base = self._get_key_value(hpe3par_keys, 'convert_to_base', 'True')
+
         # if provisioning is not set use thin
         default_prov = self.valid_prov_values[0]
         prov_value = self._get_key_value(hpe3par_keys, 'provisioning',
@@ -1929,7 +1933,8 @@ class HPE3PARCommon(object):
         return {'hpe3par_keys': hpe3par_keys,
                 'cpg': cpg, 'snap_cpg': snap_cpg,
                 'vvs_name': vvs_name, 'qos': qos,
-                'tpvv': tpvv, 'tdvv': tdvv, 'volume_type': volume_type}
+                'tpvv': tpvv, 'tdvv': tdvv, 'volume_type': volume_type,
+                'convert_to_base': convert_to_base}
 
     def get_volume_settings_from_type(self, volume, host=None):
         """Get 3PAR volume settings given a volume.
@@ -1989,6 +1994,7 @@ class HPE3PARCommon(object):
                 type_info['hpe3par_keys'])
             compression = self.get_compression_policy(
                 type_info['hpe3par_keys'])
+            convert_to_base = type_info['convert_to_base']
 
             consis_group_snap_type = False
             if volume_type is not None:
@@ -2413,15 +2419,27 @@ class HPE3PARCommon(object):
 
             self.client.createSnapshot(volume_name, snap_name, optional)
 
-            # Convert snapshot volume to base volume type
-            LOG.debug('Converting to base volume type: %s.',
-                      volume['id'])
-            model_update = self._convert_to_base_volume(volume)
+            convert_to_base = self._get_key_value(hpe3par_keys, 'convert_to_base', 'True')
+            LOG.debug("convert_to_base: " + convert_to_base)
+            if convert_to_base.lower() == 'true':
+                # Convert snapshot volume to base volume type
+                LOG.debug('Converting to base volume type: %s.',
+                          volume['id'])
+                model_update = self._convert_to_base_volume(volume)
+            else:
+                LOG.debug("volume is created as child of snapshot")
 
             # Grow the snapshot if needed
             growth_size = volume['size'] - snapshot['volume_size']
             if growth_size > 0:
                 try:
+                    LOG.debug("Size of volume is greater than snapshot")
+                    if convert_to_base.lower() == 'false':
+                        # Convert snapshot volume to base volume type
+                        LOG.debug('Converting to base volume type: %s.',
+                                  volume['id'])
+                        model_update = self._convert_to_base_volume(volume)
+
                     growth_size_mib = growth_size * units.Gi / units.Mi
                     LOG.debug('Growing volume: %(id)s by %(size)s GiB.',
                               {'id': volume['id'], 'size': growth_size})
